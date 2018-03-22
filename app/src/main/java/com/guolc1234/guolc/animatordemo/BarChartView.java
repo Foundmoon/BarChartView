@@ -21,6 +21,7 @@ import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import java.lang.annotation.Retention;
@@ -100,7 +101,7 @@ public class BarChartView extends View {
         if (mRadius != 0) {
             setRadius(0, mRadius, mRadius, 0);
         }
-        mBarMaxValuePercent = ta.getFloat(R.styleable.BarChartView_maxValuePercent, -1f);
+        mBarMaxValuePercent = ta.getFraction(R.styleable.BarChartView_maxValuePercent,1,1, -1f);
         ta.recycle();
         init();
     }
@@ -196,12 +197,7 @@ public class BarChartView extends View {
             textCanvas.save();
             if (mDirection == VERTICAL) {
                 textCanvas.rotate(90, textX, textY);
-//                final int min = (int) Math.min(mTextOuterWidth, mTextWidth);
-//                if (min > mBarValueConstant) {
-                    textCanvas.translate(textX - (mTextOuterWidth - mBarValueConstant) * 0.5f, textY - textHeight - mTextBarMargin);
-//                } else {
-//                    textCanvas.translate(textX + (min - mBarValueConstant) * 0.5f, textY - textHeight - mTextBarMargin);
-//                }
+                textCanvas.translate(textX - (mTextOuterWidth - mBarValueConstant) * 0.5f, textY - textHeight - mTextBarMargin);
             } else {
                 if (textHeight > mBarValueConstant) {
                     textCanvas.translate(textX, textY - (textHeight - mBarValueConstant) * 0.5f);
@@ -343,9 +339,6 @@ public class BarChartView extends View {
         } else {
             mTextOuterWidth = Math.round(mBarValueConstant*1.2f);
         }
-    }
-    private void configTextSpace(){
-
     }
 
 }
