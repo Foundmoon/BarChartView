@@ -17,6 +17,8 @@ import android.graphics.Xfermode;
 import android.graphics.drawable.Drawable;
 import android.support.annotation.IntDef;
 import android.support.annotation.Nullable;
+import android.text.Layout;
+import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.view.View;
@@ -35,22 +37,22 @@ public class BarChartView extends View {
 
     private final int DEFAULT_TEXT_SIZE = 39;//字号缺省值
     private final int DEFAULT_TEXT_MARGIN = 20;//柱状图和文字缺省值
-    private final int DEFAULT_BAR_INTERVAL = 18;//柱状图间距缺省值
 
     private float mTextSize;
     private int mTextBarMargin;//文字和柱状图顶部的间距
     private int mTextColor;
     private int mDirection = VERTICAL;
     private Bitmap mBarBitmap;
-    private Paint mPaint, mTextPaint;
     private Drawable mBarChartDrawable;
+    private Paint mPaint;
     private ValueAnimator mValueAnimator;
     private String[] mTextArray;
-    private int mHeight, mInterval;
-    private float mTextHeight, mFontOffset;
+    private int mHeight, mWidth, mInterval;
+    private float mTextHeight,mTextWidth;//单纯根据文字字号和字数决定的文字宽度
     private float mTextSpace;//文字沿着柱状图渐长方向上的文字占据的空间;
-    private float mTextWidth;//单纯根据文字字号和字数决定的文字宽度
-    private int mBarValueConstant, mBarMaxValue;//Y值为固定X值随动画增长
+    private int mTextOuterWidth;//柱状图上方文字 限制的宽度,超过此宽度则换行
+    private int mBarValueConstant = -1, mBarMaxValue = -1;//Y值为固定X值随动画增长
+    private float mBarMaxValuePercent;//horizontal时,mBarMaxValue占据View宽度的比例,vertical模式时mBarMaxValue占据View高度的比例
     private Path mPath;
     private RectF mRectF = new RectF();
     private float[] radiusArray = new float[8];
@@ -61,8 +63,10 @@ public class BarChartView extends View {
     private Canvas srcCanvas, maskCanvas, resultCanvas, textCanvas;
     private boolean autoOffset;//自动根据文字字号进行首行缩进以完全实现文字,缺省为false;
     private boolean barChartChangeable;//柱状图背景图自高与否,缺省为false;
-    private boolean autoRadius;//自动增加圆角,缺省为true
     private float mInitOffset;
+    private StaticLayout[] mStaticLayoutArray;
+    private boolean hasSetMaxPercent;
+    private TextPaint mTextPaint;
 
     public BarChartView(Context context) {
         this(context, null);
@@ -75,7 +79,10 @@ public class BarChartView extends View {
     public BarChartView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         TypedArray ta = getContext().obtainStyledAttributes(attrs, R.styleable.BarChartView);
-        mInterval = ta.getInt(R.styleable.BarChartView_intervalWidth, DEFAULT_BAR_INTERVAL);
+        mInterval = ta.getInt(R.styleable.BarChartView_intervalWidth, -1);
+        if (mInterval == -1) {
+            throw new RuntimeException("must set interval value");
+        }
         mDirection = ta.getInt(R.styleable.BarChartView_direction, HORIZONTAL);
         mTextSize = ta.getDimensionPixelSize(R.styleable.BarChartView_textSize, DEFAULT_TEXT_SIZE);
         final int id = ta.getResourceId(R.styleable.BarChartView_textArray, 0);
@@ -84,10 +91,8 @@ public class BarChartView extends View {
         }
         mTextColor = ta.getColor(R.styleable.BarChartView_textColor, Color.BLACK);
         mTextArray = context.getResources().getStringArray(id);
-        mBarCurrentValueArray = new float[mTextArray.length];
-        mBarMaxValueArray = new float[mTextArray.length];
         autoOffset = ta.getBoolean(R.styleable.BarChartView_autoOffset, false);
-        mBarValueConstant = ta.getInt(R.styleable.BarChartView_columnSize, 0);
+        setBarConstantValueAndTextOuterWidth(ta.getInt(R.styleable.BarChartView_columnSize, 0));
         mTextBarMargin = ta.getInt(R.styleable.BarChartView_textMargin, DEFAULT_TEXT_MARGIN);
         barChartChangeable = ta.getBoolean(R.styleable.BarChartView_barChangeable, false);
         mBarChartDrawable = ta.getDrawable(R.styleable.BarChartView_barChartDrawable);
@@ -95,7 +100,7 @@ public class BarChartView extends View {
         if (mRadius != 0) {
             setRadius(0, mRadius, mRadius, 0);
         }
-        autoRadius = ta.getBoolean(R.styleable.BarChartView_autoRadius, true);
+        mBarMaxValuePercent = ta.getFloat(R.styleable.BarChartView_maxValuePercent, -1f);
         ta.recycle();
         init();
     }
@@ -104,12 +109,18 @@ public class BarChartView extends View {
         setLayerType(LAYER_TYPE_SOFTWARE, null);
         mPath = new Path();
         mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final int len = mTextArray.length;
+        mBarCurrentValueArray = new float[len];
+        mBarMaxValueArray = new float[len];
+        mStaticLayoutArray = new StaticLayout[len];
+        hasSetMaxPercent = mBarMaxValuePercent > 0f && mBarMaxValuePercent <= 1f;
         mTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         mTextPaint.setTextSize(mTextSize);
         mTextPaint.setColor(mTextColor);
         mTextWidth = mTextPaint.measureText(mTextArray[0]);
-        getFontParam();
-        mTextSpace = mDirection == HORIZONTAL ? mTextWidth : mTextHeight;
+        Paint.FontMetrics fontMetrics = new Paint.FontMetrics();
+        mTextPaint.getFontMetrics(fontMetrics);
+        mTextHeight = fontMetrics.bottom - fontMetrics.top;
     }
 
     @Override
@@ -120,7 +131,6 @@ public class BarChartView extends View {
         }
         final int length = mTextArray.length;
         final float offset = mInitOffset = getInitOffset();
-
         if (mDirection == HORIZONTAL) {
             if (MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.EXACTLY) {
                 if (mInterval == 0 || mBarValueConstant == 0) {
@@ -138,29 +148,14 @@ public class BarChartView extends View {
                 widthMeasureSpec = MeasureSpec.makeMeasureSpec(autoWidth, MeasureSpec.EXACTLY);
             }
         }
-        final int mWidth = MeasureSpec.getSize(widthMeasureSpec);
+        mWidth = MeasureSpec.getSize(widthMeasureSpec);
         mHeight = MeasureSpec.getSize(heightMeasureSpec);
         setMeasuredDimension(mWidth, mHeight);
+        setBarConstantValueAndTextOuterWidth(mDirection == HORIZONTAL ? Math.round((mHeight - (length - 1) * 1f * mInterval - offset * 2f) / length) : Math.round((mWidth - (length - 1) * 1f * mInterval - offset * 2f) / length));
 
-        switch (mDirection) {
-            case HORIZONTAL:
-                if (autoRadius) {
-                    final float mRadius = (mWidth - mTextSpace) * 0.5f;
-                    setRadius(0, mRadius, mRadius, 0);
-                }
-                mBarValueConstant = (int) ((mHeight - (length - 1) * 1f * mInterval - offset * 2f) / length);
-                mBarMaxValue = (int) (mWidth - mTextSpace - mTextBarMargin);
-                break;
-            case VERTICAL:
-                if (autoRadius) {
-                    final float mRadius = (mHeight - mTextSpace) * 0.5f;
-                    setRadius(0, mRadius, mRadius, 0);
-                }
-                mBarValueConstant = (int) ((mWidth - (length - 1) * 1f * mInterval - offset * 2f) / length);
-                mBarMaxValue = (int) (mHeight - mTextSpace - mTextBarMargin);
-                break;
-        }
-
+        configOuterWidth();
+        configStaticLayout();
+        setBarMaxValue();
         mBarMaxValueArray[0] = mBarMaxValue * 0.2f;
         mBarMaxValueArray[1] = mBarMaxValue * 0.3f;
         mBarMaxValueArray[2] = mBarMaxValue * 0.4f;
@@ -182,9 +177,9 @@ public class BarChartView extends View {
         }
         configBarBitmap();
         configBitmapAndCanvas(canvas);
-        final float mTextOffset = mFontOffset;
         for (int i = 0; i < mTextArray.length; i++) {
             final int offset = (mInterval + mBarValueConstant) * i + initOffset;
+            final StaticLayout currentStaticLayout = mStaticLayoutArray[i];
             mPath.reset();
             mRectF.set(0, offset, mBarCurrentValueArray[i], offset + mBarValueConstant);
             mPath.addRoundRect(mRectF, radiusArray, Path.Direction.CW);
@@ -195,27 +190,34 @@ public class BarChartView extends View {
                 srcCanvas.drawBitmap(mBarBitmap, 0, offset, null);
             }
             maskCanvas.drawPath(mPath, mPaint);
-            final float textX = mRectF.width() + mTextBarMargin;
-            final float textY = mRectF.centerY() + mTextOffset;
+            final float textX = mRectF.width() + (mDirection == VERTICAL ? 0 : mTextBarMargin);
+            final float textY = mRectF.top;
+            final int textHeight = currentStaticLayout.getHeight();
             textCanvas.save();
             if (mDirection == VERTICAL) {
                 textCanvas.rotate(90, textX, textY);
-                textCanvas.translate(-mTextOffset - mBarValueConstant * 0.5f, 0);
-                if (mTextWidth > mBarValueConstant) {
-                    textCanvas.translate(-Math.abs(mTextWidth - mBarValueConstant) * 0.5f, 0f);
+//                final int min = (int) Math.min(mTextOuterWidth, mTextWidth);
+//                if (min > mBarValueConstant) {
+                    textCanvas.translate(textX - (mTextOuterWidth - mBarValueConstant) * 0.5f, textY - textHeight - mTextBarMargin);
+//                } else {
+//                    textCanvas.translate(textX + (min - mBarValueConstant) * 0.5f, textY - textHeight - mTextBarMargin);
+//                }
+            } else {
+                if (textHeight > mBarValueConstant) {
+                    textCanvas.translate(textX, textY - (textHeight - mBarValueConstant) * 0.5f);
                 } else {
-                    textCanvas.translate(Math.abs(mTextWidth - mBarValueConstant) * 0.5f, 0f);
+                    textCanvas.translate(textX, textY + (mBarValueConstant - textHeight) * 0.5f);
                 }
             }
-            textCanvas.drawText(mTextArray[i], textX, textY, mTextPaint);
+            currentStaticLayout.draw(textCanvas);
             textCanvas.restore();
         }
-        resultCanvas.drawBitmap(srcBitmap, 0, 0, null);
+        resultCanvas.drawBitmap(srcBitmap, 0, 0, mPaint);
         mPaint.setXfermode(mXfermode);
         resultCanvas.drawBitmap(maskBitmap, 0, 0, mPaint);
         mPaint.setXfermode(null);
-        resultCanvas.drawBitmap(textBitmap, 0, 0, null);
-        canvas.drawBitmap(resultBitmap, 0, 0, null);
+        resultCanvas.drawBitmap(textBitmap, 0, 0, mPaint);
+        canvas.drawBitmap(resultBitmap, 0, 0, mPaint);
         canvas.restore();
     }
 
@@ -298,21 +300,52 @@ public class BarChartView extends View {
         this.mDirection = mDirection;
     }
 
-    private void getFontParam() {
-        if (mFontOffset == 0f || mTextHeight == 0f) {
-            Paint.FontMetrics fontMetrics = new Paint.FontMetrics();
-            mTextPaint.getFontMetrics(fontMetrics);
-            mFontOffset = (fontMetrics.descent - fontMetrics.ascent) * 0.5f - fontMetrics.descent;
-            mTextHeight = fontMetrics.bottom - fontMetrics.top;
-        }
-    }
-
     private float getInitOffset() {
         if (autoOffset) {
-            getFontParam();
-            return mDirection == HORIZONTAL ? mTextHeight * 0.5f : mTextWidth * 0.5f;
+            return mDirection == HORIZONTAL ? mStaticLayoutArray[0].getHeight() * 0.5f : mStaticLayoutArray[0].getWidth() * 0.5f;
         } else {
             return mDirection == HORIZONTAL ? getPaddingTop() : getPaddingLeft();
         }
     }
+
+    private void setBarConstantValueAndTextOuterWidth(int size) {
+        mBarValueConstant = size;
+        mTextOuterWidth = mDirection == HORIZONTAL ? mWidth - mTextBarMargin - mBarMaxValue : (int) (mBarValueConstant * 1.2f);
+    }
+
+    private void setBarMaxValue() {
+        if (hasSetMaxPercent) {
+            mBarMaxValue = (int) (mDirection == HORIZONTAL ? mWidth * mBarMaxValuePercent : mHeight * mBarMaxValuePercent);
+        } else {
+            if (mDirection == HORIZONTAL) {
+                mBarMaxValue = mWidth - mTextBarMargin - mTextOuterWidth;
+            } else {
+                mBarMaxValue = mHeight - mTextBarMargin - mStaticLayoutArray[0].getHeight();
+            }
+        }
+    }
+
+    private void configStaticLayout() {
+        for (int i = 0; i < mTextArray.length; i++) {
+            mStaticLayoutArray[i] = new StaticLayout(mTextArray[i], mTextPaint, mTextOuterWidth,
+                    mDirection == HORIZONTAL ? Layout.Alignment.ALIGN_NORMAL:Layout.Alignment.ALIGN_CENTER,
+                    1.0F, 0.0F, true);
+        }
+    }
+
+    private void configOuterWidth() {
+        if (mDirection == HORIZONTAL) {
+            if (hasSetMaxPercent) {
+                mTextOuterWidth = (int) (mWidth * (1f - mBarMaxValuePercent) - mTextBarMargin);
+            } else {
+                mTextOuterWidth = (int) mTextWidth;
+            }
+        } else {
+            mTextOuterWidth = Math.round(mBarValueConstant*1.2f);
+        }
+    }
+    private void configTextSpace(){
+
+    }
+
 }

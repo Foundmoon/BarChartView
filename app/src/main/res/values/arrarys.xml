@@ -11,13 +11,13 @@
     </string-array>
 
     <string-array name="day_of_weeks_long">
-        <item>周一二三四</item>
-        <item>周一二三四</item>
-        <item>周一二三四</item>
-        <item>周一二三四</item>
-        <item>周一二三四</item>
-        <item>周一二三四</item>
-        <item>周一二三四</item>
+        <item>周一二周周</item>
+        <item>周一二周周</item>
+        <item>周一二周周</item>
+        <item>周一二周周</item>
+        <item>周一二周周</item>
+        <item>周一二周周</item>
+        <item>周一二周周</item>
     </string-array>
 
 </resources>

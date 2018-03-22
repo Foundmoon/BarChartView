@@ -12,21 +12,20 @@
         android:background="#00ff00"
         app:intervalWidth="29"
         app:autoRadius="true"
-        app:barChangeable="false"
         app:barChartDrawable="@drawable/hot"
         app:columnSize="58"
-        app:autoOffset="true"
         app:direction="horizontal"
-        app:textArray="@array/day_of_weeks"
+        app:textArray="@array/day_of_weeks_long"
         app:textSize="@dimen/big"
         android:id="@+id/cccc"
         android:layout_width="match_parent"
-        android:layout_height="150dp"/>
+        android:layout_height="250dp"/>
 
     <com.guolc1234.guolc.animatordemo.BarChartView
         app:barChartDrawable="@drawable/hot"
         android:id="@+id/dddd"
-        android:layout_width="230dp"
+        app:autoRadius="false"
+        android:layout_width="match_parent"
         android:layout_height="160dp"
         android:background="#ffff00"
         app:autoOffset="false"
@@ -34,7 +33,7 @@
         app:direction="vertical"
         app:intervalWidth="29"
         app:textArray="@array/day_of_weeks"
-        app:textSize="@dimen/big"/>
+        app:textSize="@dimen/middle"/>
 
     <TextView
         android:id="@+id/tv"

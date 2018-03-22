@@ -16,5 +16,6 @@
         <attr name="barChartDrawable" format="reference"/>
         <attr name="barRadius" format="float"/>
         <attr name="autoRadius" format="boolean"/>
+        <attr name="maxValuePercent" format="float"/>
     </declare-styleable>
 </resources>
