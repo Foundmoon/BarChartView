@@ -25,16 +25,25 @@
     <com.guolc1234.guolc.animatordemo.BarChartView
         app:barChartDrawable="@drawable/hot"
         android:id="@+id/dddd"
-        android:layout_width="wrap_content"
-        android:layout_height="120dp"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
         android:layout_marginTop="10dp"
         android:background="#ffff00"
         app:autoOffset="true"
         app:barChangeable="true"
-        app:direction="horizontal"
+        app:direction="vertical"
         app:intervalWidth="29"
         app:textArray="@array/day_of_weeks_long"
         app:textSize="@dimen/big"/>
+
+    <TextView
+        android:id="@+id/tv"
+        android:gravity="center"
+        android:textSize="27sp"
+        android:textColor="#ff0000"
+        android:text="start"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"/>
 
 
 </LinearLayout>
