@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="BarChartView">
+        <attr name="direction" format="integer">
+            <enum name="horizontal" value="0" />
+            <enum name="vertical" value="1" />
+        </attr>
+        <attr name="textArray" format="reference"/>
+        <attr name="intervalWidth" format="integer"/>
+        <attr name="textSize" format="dimension"/>
+        <attr name="textColor" format="color"/>
+        <attr name="autoOffset" format="boolean"/>
+        <attr name="columnSize" format="integer"/>
+        <attr name="textMargin" format="integer"/>
+        <attr name="barChangeable" format="boolean"/>
+        <attr name="barChartDrawable" format="reference"/>
+        <attr name="barRadius" format="float"/>
+        <attr name="autoRadius" format="boolean"/>
+    </declare-styleable>
+</resources>
