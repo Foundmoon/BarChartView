@@ -47,13 +47,13 @@ public class BarChartView extends View {
     private ValueAnimator mValueAnimator;
     private String[] mTextArray;
     private int mHeight, mInterval;
-    private float  mTextHeight, mFontOffset;
+    private float mTextHeight, mFontOffset;
     private float mTextSpace;//文字沿着柱状图渐长方向上的文字占据的空间;
     private float mTextWidth;//单纯根据文字字号和字数决定的文字宽度
     private int mBarValueConstant, mBarMaxValue;//Y值为固定X值随动画增长
     private Path mPath;
     private RectF mRectF = new RectF();
-    private float[] radiusArray  = new float[8];
+    private float[] radiusArray = new float[8];
     private float[] mBarCurrentValueArray;
     private float[] mBarMaxValueArray;
     private final Xfermode mXfermode = new PorterDuffXfermode(PorterDuff.Mode.DST_IN);
@@ -62,6 +62,7 @@ public class BarChartView extends View {
     private boolean autoOffset;//自动根据文字字号进行首行缩进以完全实现文字,缺省为false;
     private boolean barChartChangeable;//柱状图背景图自高与否,缺省为false;
     private boolean autoRadius;//自动增加圆角,缺省为true
+    private float mInitOffset;
 
     public BarChartView(Context context) {
         this(context, null);
@@ -90,11 +91,11 @@ public class BarChartView extends View {
         mTextBarMargin = ta.getInt(R.styleable.BarChartView_textMargin, DEFAULT_TEXT_MARGIN);
         barChartChangeable = ta.getBoolean(R.styleable.BarChartView_barChangeable, false);
         mBarChartDrawable = ta.getDrawable(R.styleable.BarChartView_barChartDrawable);
-        final float mRadius = ta.getFloat(R.styleable.BarChartView_barRadius,0);
-        if(mRadius!=0){
+        final float mRadius = ta.getFloat(R.styleable.BarChartView_barRadius, 0);
+        if (mRadius != 0) {
             setRadius(0, mRadius, mRadius, 0);
         }
-        autoRadius = ta.getBoolean(R.styleable.BarChartView_autoRadius,true);
+        autoRadius = ta.getBoolean(R.styleable.BarChartView_autoRadius, true);
         ta.recycle();
         init();
     }
@@ -118,12 +119,14 @@ public class BarChartView extends View {
             throw new RuntimeException("mTextArray must be not null!");
         }
         final int length = mTextArray.length;
+        final float offset = mInitOffset = getInitOffset();
+
         if (mDirection == HORIZONTAL) {
             if (MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.EXACTLY) {
                 if (mInterval == 0 || mBarValueConstant == 0) {
                     throw new RuntimeException("intervalWidth or columnSize must not be null");
                 }
-                int autoHeight = Math.round(getInitOffset() * 2f + mBarValueConstant * length + mInterval * (length - 1));
+                int autoHeight = Math.round(offset * 2f + mBarValueConstant * length + mInterval * (length - 1));
                 heightMeasureSpec = MeasureSpec.makeMeasureSpec(autoHeight, MeasureSpec.EXACTLY);
             }
         } else {
@@ -131,17 +134,17 @@ public class BarChartView extends View {
                 if (mInterval == 0 || mBarValueConstant == 0) {
                     throw new RuntimeException("intervalWidth or columnSize must not be null");
                 }
-                int autoWidth = Math.round(getInitOffset() * 2f + mBarValueConstant * length + mInterval * (length - 1));
+                int autoWidth = Math.round(offset * 2f + mBarValueConstant * length + mInterval * (length - 1));
                 widthMeasureSpec = MeasureSpec.makeMeasureSpec(autoWidth, MeasureSpec.EXACTLY);
             }
         }
         final int mWidth = MeasureSpec.getSize(widthMeasureSpec);
         mHeight = MeasureSpec.getSize(heightMeasureSpec);
         setMeasuredDimension(mWidth, mHeight);
-        final float offset = getInitOffset();
+
         switch (mDirection) {
             case HORIZONTAL:
-                if(autoRadius){
+                if (autoRadius) {
                     final float mRadius = (mWidth - mTextSpace) * 0.5f;
                     setRadius(0, mRadius, mRadius, 0);
                 }
@@ -149,7 +152,7 @@ public class BarChartView extends View {
                 mBarMaxValue = (int) (mWidth - mTextSpace - mTextBarMargin);
                 break;
             case VERTICAL:
-                if(autoRadius){
+                if (autoRadius) {
                     final float mRadius = (mHeight - mTextSpace) * 0.5f;
                     setRadius(0, mRadius, mRadius, 0);
                 }
@@ -172,7 +175,7 @@ public class BarChartView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         canvas.save();
-        final int initOffset = (int) getInitOffset();
+        final int initOffset = (int) mInitOffset;
         if (mDirection == VERTICAL) {
             canvas.rotate(-90);
             canvas.translate(-mHeight, 0);
@@ -307,7 +310,7 @@ public class BarChartView extends View {
     private float getInitOffset() {
         if (autoOffset) {
             getFontParam();
-            return mTextHeight * 0.5f;
+            return mDirection == HORIZONTAL ? mTextHeight * 0.5f : mTextWidth * 0.5f;
         } else {
             return mDirection == HORIZONTAL ? getPaddingTop() : getPaddingLeft();
         }
