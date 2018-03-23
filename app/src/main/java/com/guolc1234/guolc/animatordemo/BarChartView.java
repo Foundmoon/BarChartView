@@ -21,7 +21,6 @@ import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 
 import java.lang.annotation.Retention;
@@ -40,14 +39,14 @@ public class BarChartView extends View {
     private final int DEFAULT_TEXT_MARGIN = 20;//柱状图和文字缺省值
 
     private float mTextSize;
+    private float mTitleTextSize;
     private int mTextBarMargin;//文字和柱状图顶部的间距
-    private int mTextColor;
+    private int mTextColor,mTitleTextColor;
     private int mDirection = VERTICAL;
     private Bitmap mBarBitmap;
     private Drawable mBarChartDrawable;
     private Paint mPaint;
     private ValueAnimator mValueAnimator;
-    private String[] mTextArray;
     private int mHeight, mWidth, mInterval;
     private float mTextHeight,mTextWidth;//单纯根据文字字号和字数决定的文字宽度
     private float mTextSpace;//文字沿着柱状图渐长方向上的文字占据的空间;
@@ -65,9 +64,14 @@ public class BarChartView extends View {
     private boolean autoOffset;//自动根据文字字号进行首行缩进以完全实现文字,缺省为false;
     private boolean barChartChangeable;//柱状图背景图自高与否,缺省为false;
     private float mInitOffset;
-    private StaticLayout[] mStaticLayoutArray;
+    private String[] mTextArray;
+    private String[] mTitleArray;
+    private StaticLayout[] mTextStaticLayoutArray;
+    private StaticLayout[] mTitleStaticLayoutArray;
     private boolean hasSetMaxPercent;
-    private TextPaint mTextPaint;
+    private TextPaint mTextPaint,mTitleTextPaint;
+    private int titleMargin = 18;
+    private int mTitleOuterWidth;
 
     public BarChartView(Context context) {
         this(context, null);
@@ -85,15 +89,19 @@ public class BarChartView extends View {
             throw new RuntimeException("must set interval value");
         }
         mDirection = ta.getInt(R.styleable.BarChartView_direction, HORIZONTAL);
-        mTextSize = ta.getDimensionPixelSize(R.styleable.BarChartView_textSize, DEFAULT_TEXT_SIZE);
-        final int id = ta.getResourceId(R.styleable.BarChartView_textArray, 0);
-        if (id == 0) {
+        final int textId = ta.getResourceId(R.styleable.BarChartView_textArray, 0);
+        final int titleId = ta.getResourceId(R.styleable.BarChartView_titleArray, 0);
+        if (textId == 0 ) {
             throw new RuntimeException("must set text array");
         }
+        mTextSize = ta.getDimensionPixelSize(R.styleable.BarChartView_textSize, DEFAULT_TEXT_SIZE);
+        mTitleTextSize = ta.getDimensionPixelSize(R.styleable.BarChartView_titleTextSize, DEFAULT_TEXT_SIZE);
         mTextColor = ta.getColor(R.styleable.BarChartView_textColor, Color.BLACK);
-        mTextArray = context.getResources().getStringArray(id);
+        mTitleTextColor = ta.getColor(R.styleable.BarChartView_titleTextColor, Color.BLACK);
+        mTextArray = context.getResources().getStringArray(textId);
+        mTitleArray = context.getResources().getStringArray(titleId);
         autoOffset = ta.getBoolean(R.styleable.BarChartView_autoOffset, false);
-        setBarConstantValueAndTextOuterWidth(ta.getInt(R.styleable.BarChartView_columnSize, 0));
+        setBarConstantValue(ta.getInt(R.styleable.BarChartView_columnSize, 0));
         mTextBarMargin = ta.getInt(R.styleable.BarChartView_textMargin, DEFAULT_TEXT_MARGIN);
         barChartChangeable = ta.getBoolean(R.styleable.BarChartView_barChangeable, false);
         mBarChartDrawable = ta.getDrawable(R.styleable.BarChartView_barChartDrawable);
@@ -113,11 +121,22 @@ public class BarChartView extends View {
         final int len = mTextArray.length;
         mBarCurrentValueArray = new float[len];
         mBarMaxValueArray = new float[len];
-        mStaticLayoutArray = new StaticLayout[len];
+        mTextStaticLayoutArray = new StaticLayout[len];
         hasSetMaxPercent = mBarMaxValuePercent > 0f && mBarMaxValuePercent <= 1f;
         mTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         mTextPaint.setTextSize(mTextSize);
         mTextPaint.setColor(mTextColor);
+        if(mTitleArray!=null){
+            mTitleStaticLayoutArray = new StaticLayout[len];
+            mTitleTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            mTitleTextPaint.setTextSize(mTitleTextSize);
+            mTitleTextPaint.setColor(mTitleTextColor);
+            for (int i = 0; i < mTitleArray.length; i++) {
+                mTitleStaticLayoutArray[i] = new StaticLayout(mTitleArray[i], mTitleTextPaint, mTitleOuterWidth= getTitleOuterWidth(),
+                        Layout.Alignment.ALIGN_OPPOSITE,
+                        1.0F, 0.0F, true);
+            }
+        }
         mTextWidth = mTextPaint.measureText(mTextArray[0]);
         Paint.FontMetrics fontMetrics = new Paint.FontMetrics();
         mTextPaint.getFontMetrics(fontMetrics);
@@ -152,7 +171,9 @@ public class BarChartView extends View {
         mWidth = MeasureSpec.getSize(widthMeasureSpec);
         mHeight = MeasureSpec.getSize(heightMeasureSpec);
         setMeasuredDimension(mWidth, mHeight);
-        setBarConstantValueAndTextOuterWidth(mDirection == HORIZONTAL ? Math.round((mHeight - (length - 1) * 1f * mInterval - offset * 2f) / length) : Math.round((mWidth - (length - 1) * 1f * mInterval - offset * 2f) / length));
+        setBarConstantValue(mDirection == HORIZONTAL ?
+                Math.round((mHeight - (length - 1) * 1f * mInterval - offset * 2f) / length) :
+                Math.round((mWidth - (length - 1) * 1f * mInterval - offset * 2f) / length));
 
         configOuterWidth();
         configStaticLayout();
@@ -165,22 +186,30 @@ public class BarChartView extends View {
         mBarMaxValueArray[5] = mBarMaxValue * 0.7f;
         mBarMaxValueArray[6] = mBarMaxValue * 0.8f;
     }
+    private int getTitleOuterWidth(){
+        return (int) Math.ceil(mTitleTextPaint.measureText(mTitleArray[0]));
+    }
 
     @SuppressLint("DrawAllocation")
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+
         canvas.save();
-        final int initOffset = (int) mInitOffset;
         if (mDirection == VERTICAL) {
             canvas.rotate(-90);
             canvas.translate(-mHeight, 0);
         }
+        drawTitle(canvas);
+        if(mTitleArray!=null){
+            canvas.translate(mTitleOuterWidth + titleMargin,0);
+        }
+        final int initOffset = (int) mInitOffset;
         configBarBitmap();
         configBitmapAndCanvas(canvas);
         for (int i = 0; i < mTextArray.length; i++) {
             final int offset = (mInterval + mBarValueConstant) * i + initOffset;
-            final StaticLayout currentStaticLayout = mStaticLayoutArray[i];
+            final StaticLayout currentStaticLayout = mTextStaticLayoutArray[i];
             mPath.reset();
             mRectF.set(0, offset, mBarCurrentValueArray[i], offset + mBarValueConstant);
             mPath.addRoundRect(mRectF, radiusArray, Path.Direction.CW);
@@ -215,6 +244,30 @@ public class BarChartView extends View {
         resultCanvas.drawBitmap(textBitmap, 0, 0, mPaint);
         canvas.drawBitmap(resultBitmap, 0, 0, mPaint);
         canvas.restore();
+    }
+    private void drawTitle(Canvas canvas){
+        if(mTitleArray!=null){
+            final int initOffset = (int) mInitOffset;
+            for (int i = 0; i < mTitleArray.length; i++) {
+                canvas.save();
+                final int offset = (mInterval + mBarValueConstant) * i + initOffset;
+                final StaticLayout mTitleLayout = mTitleStaticLayoutArray[i];
+                final int textHeight = mTitleLayout.getHeight();
+
+                if(mDirection == HORIZONTAL){
+                    if (textHeight > mBarValueConstant) {
+                        canvas.translate(0, offset - (textHeight - mBarValueConstant) * 0.5f);
+                    } else {
+                        canvas.translate(0, offset + (mBarValueConstant - textHeight) * 0.5f);
+                    }
+                }else{
+                    canvas.rotate(90,0,offset);
+                    canvas.translate(0 - (mTitleOuterWidth - mBarValueConstant) * 0.5f, offset - textHeight - mTextBarMargin);
+                }
+                mTitleLayout.draw(canvas);
+                canvas.restore();
+            }
+        }
     }
 
     private void configBarBitmap() {
@@ -298,15 +351,14 @@ public class BarChartView extends View {
 
     private float getInitOffset() {
         if (autoOffset) {
-            return mDirection == HORIZONTAL ? mStaticLayoutArray[0].getHeight() * 0.5f : mStaticLayoutArray[0].getWidth() * 0.5f;
+            return mDirection == HORIZONTAL ? mTextStaticLayoutArray[0].getHeight() * 0.5f : mTextStaticLayoutArray[0].getWidth() * 0.5f;
         } else {
             return mDirection == HORIZONTAL ? getPaddingTop() : getPaddingLeft();
         }
     }
 
-    private void setBarConstantValueAndTextOuterWidth(int size) {
+    private void setBarConstantValue(int size) {
         mBarValueConstant = size;
-        mTextOuterWidth = mDirection == HORIZONTAL ? mWidth - mTextBarMargin - mBarMaxValue : (int) (mBarValueConstant * 1.2f);
     }
 
     private void setBarMaxValue() {
@@ -316,14 +368,17 @@ public class BarChartView extends View {
             if (mDirection == HORIZONTAL) {
                 mBarMaxValue = mWidth - mTextBarMargin - mTextOuterWidth;
             } else {
-                mBarMaxValue = mHeight - mTextBarMargin - mStaticLayoutArray[0].getHeight();
+                mBarMaxValue = mHeight - mTextBarMargin - mTextStaticLayoutArray[0].getHeight();
             }
+        }
+        if (mTitleArray != null) {
+            mBarMaxValue = mBarMaxValue - mTitleOuterWidth - titleMargin;
         }
     }
 
     private void configStaticLayout() {
         for (int i = 0; i < mTextArray.length; i++) {
-            mStaticLayoutArray[i] = new StaticLayout(mTextArray[i], mTextPaint, mTextOuterWidth,
+            mTextStaticLayoutArray[i] = new StaticLayout(mTextArray[i], mTextPaint, mTextOuterWidth,
                     mDirection == HORIZONTAL ? Layout.Alignment.ALIGN_NORMAL:Layout.Alignment.ALIGN_CENTER,
                     1.0F, 0.0F, true);
         }
