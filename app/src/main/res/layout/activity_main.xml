@@ -11,23 +11,23 @@
     <com.guolc1234.guolc.animatordemo.BarChartView
         android:background="#00ff00"
         app:barRadius="40"
-        app:intervalWidth="29"
-        app:autoRadius="true"
+        app:intervalWidth="13"
         app:barChartDrawable="@drawable/hot"
-        app:columnSize="58"
+        app:columnSize="45"
+        app:textColor="#0000ff"
         app:direction="horizontal"
         app:textArray="@array/day_of_weeks"
         app:titleArray="@array/day_of_weeks"
-        app:textSize="@dimen/big"
+        app:textSize="@dimen/middle"
+        app:titleTextColor="#FF0000"
         android:id="@+id/cccc"
         android:layout_width="match_parent"
-        android:layout_height="250dp"/>
+        android:layout_height="120dp"/>
 
     <com.guolc1234.guolc.animatordemo.BarChartView
         app:barRadius="35"
         app:barChartDrawable="@drawable/hot"
         android:id="@+id/dddd"
-        app:autoRadius="false"
         android:layout_width="match_parent"
         android:layout_height="160dp"
         android:background="#ffff00"
@@ -36,7 +36,20 @@
         app:direction="vertical"
         app:intervalWidth="29"
         app:textArray="@array/day_of_weeks_long"
-        app:titleArray="@array/day_of_weeks_long"
+        app:textSize="@dimen/middle"/>
+    <com.guolc1234.guolc.animatordemo.BarChartView
+        app:barRadius="75"
+        app:textColor="#0000ff"
+        app:titleTextColor="#ff00ff"
+        app:barChartDrawable="@drawable/hot"
+        android:id="@+id/aaaa"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:background="#45ff0000"
+        app:direction="vertical"
+        app:intervalWidth="29"
+        app:textArray="@array/day_of_weeks_long"
+        app:titleArray="@array/day_of_weeks"
         app:textSize="@dimen/middle"/>
 
     <TextView
