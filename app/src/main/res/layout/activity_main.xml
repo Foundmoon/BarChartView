@@ -36,7 +36,7 @@
         app:direction="vertical"
         app:intervalWidth="29"
         app:textArray="@array/day_of_weeks_long"
-        app:titleArray="@array/day_of_weeks"
+        app:titleArray="@array/day_of_weeks_long"
         app:textSize="@dimen/middle"/>
 
     <TextView

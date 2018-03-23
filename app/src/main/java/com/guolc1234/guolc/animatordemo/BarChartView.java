@@ -71,7 +71,7 @@ public class BarChartView extends View {
     private boolean hasSetMaxPercent;
     private TextPaint mTextPaint,mTitleTextPaint;
     private int titleMargin = 18;
-    private int mTitleOuterWidth;
+    private int mTitleOuterWidth,mTitleTextHeight;
 
     public BarChartView(Context context) {
         this(context, null);
@@ -133,10 +133,11 @@ public class BarChartView extends View {
             mTitleTextPaint.setColor(mTitleTextColor);
             for (int i = 0; i < mTitleArray.length; i++) {
                 mTitleStaticLayoutArray[i] = new StaticLayout(mTitleArray[i], mTitleTextPaint, mTitleOuterWidth= getTitleOuterWidth(),
-                        Layout.Alignment.ALIGN_OPPOSITE,
+                        Layout.Alignment.ALIGN_CENTER,
                         1.0F, 0.0F, true);
             }
         }
+        mTitleTextHeight = getTitleTextHeight();
         mTextWidth = mTextPaint.measureText(mTextArray[0]);
         Paint.FontMetrics fontMetrics = new Paint.FontMetrics();
         mTextPaint.getFontMetrics(fontMetrics);
@@ -189,12 +190,17 @@ public class BarChartView extends View {
     private int getTitleOuterWidth(){
         return (int) Math.ceil(mTitleTextPaint.measureText(mTitleArray[0]));
     }
+    private int getTitleTextHeight(){
+        if(mTitleStaticLayoutArray!=null){
+            return mTitleStaticLayoutArray[0].getHeight();
+        }
+        return 0;
+    }
 
     @SuppressLint("DrawAllocation")
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
         canvas.save();
         if (mDirection == VERTICAL) {
             canvas.rotate(-90);
@@ -202,7 +208,8 @@ public class BarChartView extends View {
         }
         drawTitle(canvas);
         if(mTitleArray!=null){
-            canvas.translate(mTitleOuterWidth + titleMargin,0);
+            final int dx = mDirection == HORIZONTAL ? mTitleOuterWidth : mTitleTextHeight;
+            canvas.translate(dx + titleMargin,0);
         }
         final int initOffset = (int) mInitOffset;
         configBarBitmap();
@@ -252,7 +259,7 @@ public class BarChartView extends View {
                 canvas.save();
                 final int offset = (mInterval + mBarValueConstant) * i + initOffset;
                 final StaticLayout mTitleLayout = mTitleStaticLayoutArray[i];
-                final int textHeight = mTitleLayout.getHeight();
+                final int textHeight = mTitleTextHeight;
 
                 if(mDirection == HORIZONTAL){
                     if (textHeight > mBarValueConstant) {
@@ -262,7 +269,7 @@ public class BarChartView extends View {
                     }
                 }else{
                     canvas.rotate(90,0,offset);
-                    canvas.translate(0 - (mTitleOuterWidth - mBarValueConstant) * 0.5f, offset - textHeight - mTextBarMargin);
+                    canvas.translate(0 - (mTitleOuterWidth - mBarValueConstant) * 0.5f, offset - textHeight);
                 }
                 mTitleLayout.draw(canvas);
                 canvas.restore();
